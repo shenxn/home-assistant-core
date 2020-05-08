@@ -75,6 +75,7 @@ FLOWS = [
     "locative",
     "logi_circle",
     "luftdaten",
+    "lutron_caseta_pro",
     "mailgun",
     "melcloud",
     "met",

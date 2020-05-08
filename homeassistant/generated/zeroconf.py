@@ -28,6 +28,9 @@ ZEROCONF = {
     "_ipps._tcp.local.": [
         "ipp"
     ],
+    "_lutron._tcp.local.": [
+        "lutron_caseta_pro"
+    ],
     "_printer._tcp.local.": [
         "brother"
     ],

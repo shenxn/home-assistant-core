@@ -1,0 +1,25 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Hub already configured."
+        },
+        "error": {
+            "cannot_connect": "Cannot connect: ",
+            "unknown": "Unknown exception"
+        },
+        "step": {
+            "integration": {
+                "data": {
+                    "integration_report": "Integration report"
+                }
+            },
+            "user": {
+                "data": {
+                    "host": "Host",
+                    "mac": "Mac"
+                }
+            }
+        }
+    },
+    "title": "Lutron Cas\u00e9ta Pro"
+}

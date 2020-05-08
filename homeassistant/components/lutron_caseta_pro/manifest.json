@@ -1,0 +1,12 @@
+{
+  "domain": "lutron_caseta_pro",
+  "name": "lutron_caseta_pro",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/lutron_caseta_pro",
+  "requirements": [],
+  "zeroconf": ["_lutron._tcp.local."],
+  "dependencies": [],
+  "codeowners": [
+    "@shenxn"
+  ]
+}

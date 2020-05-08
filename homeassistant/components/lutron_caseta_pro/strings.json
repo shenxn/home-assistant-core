@@ -1,0 +1,25 @@
+{
+  "title": "Lutron Caséta Pro",
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "host": "Host",
+          "mac": "Mac"
+        }
+      },
+      "integration": {
+        "data": {
+          "integration_report": "Integration report"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect: ",
+      "unknown": "Unknown exception"
+    },
+    "abort": {
+      "already_configured": "Hub already configured."
+    }
+  }
+}
