@@ -5,7 +5,7 @@ from typing import Optional
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DISCOVERY, CONF_IP_ADDRESS
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 
 from . import (
     DATA_CONFIG_ENTRIES,
@@ -23,8 +23,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Yeelight from a config entry."""
 
-    @callback
-    def async_setup_binary_sensor(ipaddr):
+    async def async_setup_binary_sensor(ipaddr):
         device = hass.data[DOMAIN][DATA_DEVICES][ipaddr]
 
         if device.is_nightlight_supported:
@@ -36,7 +35,7 @@ async def async_setup_entry(
             DATA_SETUP_BINARY_SENSOR
         ] = async_setup_binary_sensor
     else:
-        async_setup_binary_sensor(config_entry.data[CONF_IP_ADDRESS])
+        await async_setup_binary_sensor(config_entry.data[CONF_IP_ADDRESS])
 
 
 class YeelightNightlightModeSensor(YeelightEntity, BinarySensorEntity):
