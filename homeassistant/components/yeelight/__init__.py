@@ -18,7 +18,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, dispatcher_send
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -546,6 +546,7 @@ class YeelightDevice:
     def update(self):
         """Update device properties and send data updated signal."""
         self._update_properties()
+        dispatcher_send(self._hass, DATA_UPDATED.format(self._ipaddr))
 
 
 class YeelightEntity(Entity):
