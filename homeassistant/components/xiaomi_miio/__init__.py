@@ -65,7 +65,10 @@ async def async_setup_gateway_entry(
         sw_version=gateway_info.firmware_version,
     )
 
-    for component in GATEWAY_PLATFORMS:
+    platforms = GATEWAY_PLATFORMS
+    if gateway_info.model == "lumi.acpartner.v3":
+        platforms.append("switch")
+    for component in platforms:
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, component)
         )

@@ -24,6 +24,7 @@ from homeassistant.const import (
 from homeassistant.exceptions import PlatformNotReady
 import homeassistant.helpers.config_validation as cv
 
+from .config_flow import CONF_FLOW_TYPE, CONF_GATEWAY
 from .const import (
     DOMAIN,
     SERVICE_SET_POWER_MODE,
@@ -184,6 +185,37 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     async_add_entities(devices, update_before_add=True)
 
+    await _async_setup_services(hass)
+
+
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up the Xiaomi switch from a config entry."""
+    devices = []
+
+    if DATA_KEY not in hass.data:
+        hass.data[DATA_KEY] = {}
+
+    # Gateway sub devices
+    if config_entry.data[CONF_FLOW_TYPE] == CONF_GATEWAY:
+        host = config_entry.data[CONF_HOST]
+        token = config_entry.data[CONF_TOKEN]
+        name = f"{config_entry.title} Socket"
+        model = "lumi.acpartner.v3"  # Only possible model
+        gateway_id = config_entry.unique_id
+        unique_id = f"{model}-{gateway_id}"
+        plug = AirConditioningCompanionV3(host, token)
+        device = XiaomiAirConditioningCompanionSwitch(
+            name, plug, model, unique_id, gateway_id
+        )
+        devices.append(device)
+        hass.data[DATA_KEY][host] = device
+
+    async_add_entities(devices, update_before_add=True)
+
+
+async def _async_setup_services(hass):
+    """Set up custom services."""
+
     async def async_service_handler(service):
         """Map services to methods on XiaomiPlugGenericSwitch."""
         method = SERVICE_TO_METHOD.get(service.service)
@@ -226,6 +258,7 @@ class XiaomiPlugGenericSwitch(SwitchEntity):
         self._plug = plug
         self._model = model
         self._unique_id = unique_id
+        self._gateway_device_id = None
 
         self._icon = "mdi:power-socket"
         self._available = False
@@ -258,6 +291,13 @@ class XiaomiPlugGenericSwitch(SwitchEntity):
     def available(self):
         """Return true when state is known."""
         return self._available
+
+    @property
+    def device_info(self):
+        """Return the device info of the gateway."""
+        return {
+            "identifiers": {(DOMAIN, self._gateway_device_id)},
+        }
 
     @property
     def device_state_attributes(self):
@@ -503,9 +543,11 @@ class ChuangMiPlugSwitch(XiaomiPlugGenericSwitch):
 class XiaomiAirConditioningCompanionSwitch(XiaomiPlugGenericSwitch):
     """Representation of a Xiaomi AirConditioning Companion."""
 
-    def __init__(self, name, plug, model, unique_id):
+    def __init__(self, name, plug, model, unique_id, gateway_device_id=None):
         """Initialize the acpartner switch."""
         super().__init__(name, plug, model, unique_id)
+
+        self._gateway_device_id = gateway_device_id
 
         self._state_attrs.update({ATTR_TEMPERATURE: None, ATTR_LOAD_POWER: None})
 
