@@ -192,6 +192,7 @@ FLOWS = [
     "wolflink",
     "xiaomi_aqara",
     "xiaomi_miio",
+    "yeelight",
     "zerproc",
     "zha",
     "zwave"
