@@ -18,7 +18,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.dispatcher import dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_send, dispatcher_send
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -167,7 +167,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def async_update(_):
         await asyncio.gather(
             *[
-                hass.async_add_executor_job(device.update)
+                device.async_update()
                 for device in list(yeelight_data[DATA_DEVICES].values())
             ]
         )
@@ -275,10 +275,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
             scanner = data[DATA_SCANNER]
             await scanner.stop_scan()
             for ipaddr in scanner.seen:
-                hass.data[DOMAIN][DATA_DEVICES].pop(ipaddr)
+                device = hass.data[DOMAIN][DATA_DEVICES].pop(ipaddr)
+                await device.async_unload()
             data[DATA_UNSUB_UPDATE_LISTENER]()
         else:
-            hass.data[DOMAIN][DATA_DEVICES].pop(entry.data[CONF_IP_ADDRESS])
+            device = hass.data[DOMAIN][DATA_DEVICES].pop(entry.data[CONF_IP_ADDRESS])
+            await device.async_unload()
             data = hass.data[DOMAIN][DATA_CONFIG_ENTRIES].pop(entry.entry_id)
             data[DATA_UNSUB_UPDATE_LISTENER]()
 
@@ -298,7 +300,7 @@ async def _async_setup_device(
         _LOGGER.error("Failed to get capabilities from %s", ipaddr)
         raise ConfigEntryNotReady
     device = YeelightDevice(hass, ipaddr, config, bulb)
-    await hass.async_add_executor_job(device.update)
+    await device.async_update()
     hass.data[DOMAIN][DATA_DEVICES][ipaddr] = device
 
     # Trigger platform setup
@@ -398,6 +400,7 @@ class YeelightDevice:
         self._bulb_device = bulb
         self._device_type = None
         self._available = False
+        self._is_listening = False
 
     @property
     def bulb(self):
@@ -543,10 +546,28 @@ class YeelightDevice:
                 ex,
             )
 
-    def update(self):
+    async def _listen(self):
+        """Listen to update."""
+        await self._hass.async_add_executor_job(self.bulb.listen, self._update_callback)
+        self._available = False
+        self._is_listening = False
+
+    async def async_update(self):
         """Update device properties and send data updated signal."""
-        self._update_properties()
+        succeed = await self._hass.async_add_executor_job(self._update_properties)
+        async_dispatcher_send(self._hass, DATA_UPDATED.format(self._ipaddr))
+        if succeed and not self._is_listening:
+            self._is_listening = True
+            # Use loop directly to avoid hass from tracking the task
+            self._hass.loop.create_task(self._listen())
+
+    def _update_callback(self, properties):
+        self._available = True
         dispatcher_send(self._hass, DATA_UPDATED.format(self._ipaddr))
+
+    async def async_unload(self):
+        """Unload the device."""
+        await self._hass.async_add_executor_job(self.bulb.stop_listening)
 
 
 class YeelightEntity(Entity):

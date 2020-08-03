@@ -148,7 +148,7 @@ EFFECTS_MAP = {
     EFFECT_POLICE2: yee_transitions.police2,
     EFFECT_CHRISTMAS: yee_transitions.christmas,
     EFFECT_RGB: yee_transitions.rgb,
-    EFFECT_RANDOM_LOOP: yee_transitions.randomloop,
+    EFFECT_RANDOM_LOOP: yee_transitions.random_loop,
     EFFECT_LSD: yee_transitions.lsd,
     EFFECT_SLOWDOWN: yee_transitions.slowdown,
 }
@@ -766,7 +766,6 @@ class YeelightGenericLight(YeelightEntity, LightEntity):
             except BulbException as ex:
                 _LOGGER.error("Unable to set the defaults: %s", ex)
                 return
-        self.device.update()
 
     def turn_off(self, **kwargs) -> None:
         """Turn off."""
@@ -775,13 +774,11 @@ class YeelightGenericLight(YeelightEntity, LightEntity):
             duration = int(kwargs.get(ATTR_TRANSITION) * 1000)  # kwarg in s
 
         self.device.turn_off(duration=duration, light_type=self.light_type)
-        self.device.update()
 
     def set_mode(self, mode: str):
         """Set a power mode."""
         try:
             self._bulb.set_power_mode(PowerMode[mode.upper()])
-            self.device.update()
         except BulbException as ex:
             _LOGGER.error("Unable to set the power mode: %s", ex)
 
@@ -793,7 +790,6 @@ class YeelightGenericLight(YeelightEntity, LightEntity):
             )
 
             self._bulb.start_flow(flow, light_type=self.light_type)
-            self.device.update()
         except BulbException as ex:
             _LOGGER.error("Unable to set effect: %s", ex)
 
@@ -805,7 +801,6 @@ class YeelightGenericLight(YeelightEntity, LightEntity):
         """
         try:
             self._bulb.set_scene(scene_class, *args)
-            self.device.update()
         except BulbException as ex:
             _LOGGER.error("Unable to set scene: %s", ex)
 
