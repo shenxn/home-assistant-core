@@ -44,12 +44,40 @@ ATTR_RINGTONE_ID = "ringtone_id"
 ATTR_RINGTONE_VOL = "ringtone_vol"
 ATTR_DEVICE_ID = "device_id"
 
+RINGTONES = {
+    0: "Police car 1",
+    1: "Police car 2",
+    2: "Accident",
+    3: "Countdown",
+    4: "Ghost",
+    5: "Sniper rifle",
+    6: "Battle",
+    7: "Air raid",
+    8: "Bark",
+    10: "Doorbell",
+    11: "Knock at a door",
+    12: "Amuse",
+    13: "Alarm clock",
+    20: "MiMix",
+    21: "Enthusiastic",
+    22: "GuitarClassic",
+    23: "IceWorldPiano",
+    24: "LeisureTime",
+    25: "ChildHood",
+    26: "MorningStreamLiet",
+    27: "MusicBox",
+    28: "Orange",
+    29: "Thinker",
+}
+
 TIME_TILL_UNAVAILABLE = timedelta(minutes=150)
 
 SERVICE_PLAY_RINGTONE = "play_ringtone"
 SERVICE_STOP_RINGTONE = "stop_ringtone"
 SERVICE_ADD_DEVICE = "add_device"
 SERVICE_REMOVE_DEVICE = "remove_device"
+
+VALID_DEVICE_ID = vol.All(cv.string, vol.Length(min=14, max=14))
 
 SERVICE_SCHEMA_PLAY_RINGTONE = vol.Schema(
     {
@@ -63,7 +91,7 @@ SERVICE_SCHEMA_PLAY_RINGTONE = vol.Schema(
 )
 
 SERVICE_SCHEMA_REMOVE_DEVICE = vol.Schema(
-    {vol.Required(ATTR_DEVICE_ID): vol.All(cv.string, vol.Length(min=14, max=14))}
+    {vol.Required(ATTR_DEVICE_ID): VALID_DEVICE_ID}
 )
 
 
