@@ -1,62 +1,145 @@
 """The tests for Xiaomi Gateway (Aqara) device actions."""
 import pytest
+import voluptuous as vol
+import voluptuous_serialize
 
 from homeassistant.components import automation
-from homeassistant.components.xiaomi_aqara import DOMAIN
-from homeassistant.helpers import device_registry
+from homeassistant.components.xiaomi_aqara import (
+    ATTR_GW_MAC,
+    ATTR_RINGTONE_ID,
+    ATTR_RINGTONE_VOL,
+    DOMAIN,
+    SERVICE_PLAY_RINGTONE,
+    SERVICE_STOP_RINGTONE,
+)
+from homeassistant.components.xiaomi_aqara.device_action import (
+    ACTION_PLAY_RINGTONE,
+    ACTION_STOP_RINGTONE,
+    ACTION_TYPES,
+    VALID_RINGTONE_ID,
+    VALID_RINGTONE_VOL,
+)
+from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_TYPE
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.device_registry import DeviceEntry, DeviceRegistry
 from homeassistant.setup import async_setup_component
 
 from tests.common import (
     MockConfigEntry,
     assert_lists_same,
+    async_get_device_automation_capabilities,
     async_get_device_automations,
     async_mock_service,
     mock_device_registry,
-    mock_registry,
 )
+
+SID = "xxxxxxxxxxxx"
 
 
 @pytest.fixture
-def device_reg(hass):
+def device_reg(hass: HomeAssistant) -> DeviceRegistry:
     """Return an empty, loaded, registry."""
     return mock_device_registry(hass)
 
 
 @pytest.fixture
-def entity_reg(hass):
-    """Return an empty, loaded, registry."""
-    return mock_registry(hass)
-
-
-async def test_get_actions(hass, device_reg, entity_reg):
-    """Test we get the expected actions from a xiaomi_aqara."""
-    config_entry = MockConfigEntry(domain="test", data={})
+async def gateway_entry(hass: HomeAssistant, device_reg: DeviceRegistry) -> DeviceEntry:
+    """Return a device entry of a Xiaomi Aqara gateway."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data={})
     config_entry.add_to_hass(hass)
-    device_entry = device_reg.async_get_or_create(
+    return device_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
-        connections={(device_registry.CONNECTION_NETWORK_MAC, "12:34:56:AB:CD:EF")},
+        identifiers={(DOMAIN, SID)},
     )
-    entity_reg.async_get_or_create(DOMAIN, "test", "5678", device_id=device_entry.id)
+
+
+async def test_get_actions_gateway(
+    hass: HomeAssistant, gateway_entry: DeviceEntry
+) -> None:
+    """Test we get the expected actions from a gateway."""
     expected_actions = [
         {
             "domain": DOMAIN,
-            "type": "turn_on",
-            "device_id": device_entry.id,
-            "entity_id": "xiaomi_aqara.test_5678",
-        },
-        {
-            "domain": DOMAIN,
-            "type": "turn_off",
-            "device_id": device_entry.id,
-            "entity_id": "xiaomi_aqara.test_5678",
-        },
+            "type": action_type,
+            "device_id": gateway_entry.id,
+        }
+        for action_type in ACTION_TYPES
     ]
-    actions = await async_get_device_automations(hass, "action", device_entry.id)
+    actions = await async_get_device_automations(hass, "action", gateway_entry.id)
     assert_lists_same(actions, expected_actions)
 
 
-async def test_action(hass):
-    """Test for turn_on and turn_off actions."""
+async def test_get_actions_subdevice(
+    hass: HomeAssistant, device_reg: DeviceRegistry, gateway_entry: DeviceEntry
+) -> None:
+    """Test we don't get any action from a subdevice."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data={})
+    config_entry.add_to_hass(hass)
+    device_entry = device_reg.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, "yyyyyyyyyyyy")},
+        via_device=(DOMAIN, SID),
+    )
+    actions = await async_get_device_automations(hass, "action", device_entry.id)
+    assert_lists_same(actions, [])
+
+
+@pytest.mark.parametrize(
+    "action_type,extra_fields",
+    [
+        (
+            ACTION_PLAY_RINGTONE,
+            {
+                vol.Required(ATTR_RINGTONE_ID): VALID_RINGTONE_ID,
+                vol.Optional(ATTR_RINGTONE_VOL): VALID_RINGTONE_VOL,
+            },
+        ),
+        (ACTION_STOP_RINGTONE, {}),
+    ],
+)
+async def test_get_action_capabilities(
+    hass: HomeAssistant,
+    gateway_entry: DeviceEntry,
+    action_type: str,
+    extra_fields: dict,
+) -> None:
+    """Test we get the expected action capabilities."""
+    capabilities = await async_get_device_automation_capabilities(
+        hass,
+        "action",
+        {
+            CONF_DEVICE_ID: gateway_entry.id,
+            CONF_DOMAIN: DOMAIN,
+            CONF_TYPE: action_type,
+        },
+    )
+    extra_fields = voluptuous_serialize.convert(
+        vol.Schema(extra_fields), custom_serializer=cv.custom_serializer
+    )
+    assert capabilities == {"extra_fields": extra_fields}
+
+
+@pytest.mark.parametrize(
+    "action_type,extra_fields,service",
+    [
+        (ACTION_PLAY_RINGTONE, {ATTR_RINGTONE_ID: 5}, SERVICE_PLAY_RINGTONE),
+        (
+            ACTION_PLAY_RINGTONE,
+            {ATTR_RINGTONE_ID: 3, ATTR_RINGTONE_VOL: 50},
+            SERVICE_PLAY_RINGTONE,
+        ),
+        (ACTION_STOP_RINGTONE, {}, SERVICE_STOP_RINGTONE),
+    ],
+)
+async def test_action(
+    hass: HomeAssistant,
+    gateway_entry: DeviceEntry,
+    action_type: str,
+    extra_fields: dict,
+    service: str,
+):
+    """Test for the actions."""
     assert await async_setup_component(
         hass,
         automation.DOMAIN,
@@ -65,40 +148,24 @@ async def test_action(hass):
                 {
                     "trigger": {
                         "platform": "event",
-                        "event_type": "test_event_turn_off",
+                        "event_type": f"test_event_{action_type}",
                     },
                     "action": {
                         "domain": DOMAIN,
-                        "device_id": "abcdefgh",
-                        "entity_id": "xiaomi_aqara.entity",
-                        "type": "turn_off",
+                        "device_id": gateway_entry.id,
+                        "type": action_type,
+                        **extra_fields,
                     },
-                },
-                {
-                    "trigger": {
-                        "platform": "event",
-                        "event_type": "test_event_turn_on",
-                    },
-                    "action": {
-                        "domain": DOMAIN,
-                        "device_id": "abcdefgh",
-                        "entity_id": "xiaomi_aqara.entity",
-                        "type": "turn_on",
-                    },
-                },
+                }
             ]
         },
     )
 
-    turn_off_calls = async_mock_service(hass, "xiaomi_aqara", "turn_off")
-    turn_on_calls = async_mock_service(hass, "xiaomi_aqara", "turn_on")
-
-    hass.bus.async_fire("test_event_turn_off")
+    service_calls = async_mock_service(hass, DOMAIN, service)
+    hass.bus.async_fire(f"test_event_{action_type}")
     await hass.async_block_till_done()
-    assert len(turn_off_calls) == 1
-    assert len(turn_on_calls) == 0
-
-    hass.bus.async_fire("test_event_turn_on")
-    await hass.async_block_till_done()
-    assert len(turn_off_calls) == 1
-    assert len(turn_on_calls) == 1
+    assert len(service_calls) == 1
+    service_call = service_calls[0]
+    assert service_call.data[ATTR_GW_MAC] == SID
+    for key, value in extra_fields.items():
+        assert service_call.data[key] == value
